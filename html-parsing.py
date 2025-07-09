@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 import os
 import seaborn as sns
 import numpy as np
+np.seterr(invalid='ignore')  
 
 # Load the HTML content
 with open('/kaggle/input/bet-history-of-user-1058/history_1058225375.html', 'r', encoding='utf-8') as f:
@@ -372,14 +373,26 @@ longest_win_streak = longest_streak(df['Result'], 'win')
 daily_stake_df = daily_stake.reset_index()
 daily_stake_df.columns = ['Date', 'Stake']
 daily_stake_df['Prev_Stake'] = daily_stake_df['Stake'].shift(1)
-daily_stake_df['Stake_Jump_%'] = ((daily_stake_df['Stake'] - daily_stake_df['Prev_Stake']) /
-                                   daily_stake_df['Prev_Stake']) * 100
+
+# Prevent division by zero or NaN
+prev_stake_safe = daily_stake_df['Prev_Stake'].replace(0, np.nan)
+
+# Compute safe stake jump
+stake_jump = ((daily_stake_df['Stake'] - daily_stake_df['Prev_Stake']) / prev_stake_safe) * 100
+stake_jump = stake_jump.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+daily_stake_df['Stake_Jump_%'] = stake_jump
+
+# Filter rows where jump > 100%
 sharp_jumps = daily_stake_df[daily_stake_df['Stake_Jump_%'] > 100]
 
 # ==== g. Risk Score (Simple Composite) ====
+# Ensure no NaN in night_bet_ratio
+safe_night_ratio = night_bet_ratio if pd.notna(night_bet_ratio) else 0
+
 risk_score = (
     len(risky_days) +
-    (night_bet_ratio > 25) * 2 +
+    (safe_night_ratio > 25) * 2 +
     (chasing_count > 3) * 2 +
     len(high_freq_days) +
     (longest_loss_streak >= 5) * 2 +
@@ -405,6 +418,6 @@ insight_df = pd.DataFrame.from_dict(insights, orient='index', columns=['Value'])
 os.makedirs("exports/data", exist_ok=True)
 insight_df.to_csv("exports/data/responsible_gambling_insights.csv", index=True)
 
-print("✅ Responsible Gambling Insights Exported:")
+print("Responsible Gambling Insights Exported:")
 print(insight_df)
 
