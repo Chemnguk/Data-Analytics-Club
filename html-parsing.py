@@ -180,7 +180,7 @@ refunds = (df['Result'] == 'refunded').sum()
 
 total_stake = df['Stake_Amount'].sum()
 total_winnings = df['P_n_L'].sum()
-net_profit = total_winnings - total_stake
+net_profit = (wins + refunds) - total_stake
 
 win_ratio = (wins / total_bets) * 100
 loss_ratio = (losses / total_bets) * 100
