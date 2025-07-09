@@ -403,7 +403,7 @@ insight_df = pd.DataFrame.from_dict(insights, orient='index', columns=['Value'])
 
 # ==== Export ====
 os.makedirs("exports/data", exist_ok=True)
-insight_df.to_excel("exports/data/responsible_gambling_insights.xlsx", index=True)
+insight_df.to_csv("exports/data/responsible_gambling_insights.csv", index=True)
 
 print("✅ Responsible Gambling Insights Exported:")
 print(insight_df)
