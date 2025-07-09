@@ -24,6 +24,7 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 import os
 import seaborn as sns
+import numpy as np
 
 # Load the HTML content
 with open('/kaggle/input/bet-history-of-user-1058/history_1058225375.html', 'r', encoding='utf-8') as f:
@@ -180,7 +181,7 @@ refunds = (df['Result'] == 'refunded').sum()
 
 total_stake = df['Stake_Amount'].sum()
 total_winnings = df['P_n_L'].sum()
-net_profit = (wins + refunds) - total_stake
+net_profit = total_winnings - total_stake
 
 win_ratio = (wins / total_bets) * 100
 loss_ratio = (losses / total_bets) * 100
@@ -328,4 +329,82 @@ plt.savefig("exports/plots/betting_activity_heatmap.png")
 plt.close()
 
 print("✅ All exports completed successfully.")
+
+
+# ==== Responsible Gambling Insight ====
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+df['Hour'] = df['Date'].dt.hour
+df = df.sort_values('Date').reset_index(drop=True)
+
+# ==== a. Daily Stake Threshold Breach (> NGN 10,000) ====
+daily_stake = df.groupby(df['Date'].dt.date)['Stake_Amount'].sum()
+risky_days = daily_stake[daily_stake > 10000]
+
+# ==== b. Night-Time Betting Frequency (12AM–5AM) ====
+night_bets = df[(df['Hour'] >= 0) & (df['Hour'] <= 5)]
+night_bet_ratio = (len(night_bets) / len(df)) * 100
+
+# ==== c. Chasing Losses Detection ====
+df['Prev_Result'] = df['Result'].shift(1)
+df['Prev_Stake'] = df['Stake_Amount'].shift(1)
+df['Chasing_Loss'] = (df['Prev_Result'] == 'lose') & (df['Stake_Amount'] > df['Prev_Stake'])
+chasing_count = df['Chasing_Loss'].sum()
+
+# ==== d. Excessive Daily Bets (>10 per day) ====
+bets_per_day = df.groupby(df['Date'].dt.date).size()
+high_freq_days = bets_per_day[bets_per_day > 10]
+
+# ==== e. Win/Loss Streaks ====
+def longest_streak(series, result):
+    streak = max_streak = 0
+    for val in series:
+        if val == result:
+            streak += 1
+            max_streak = max(max_streak, streak)
+        else:
+            streak = 0
+    return max_streak
+
+longest_loss_streak = longest_streak(df['Result'], 'lose')
+longest_win_streak = longest_streak(df['Result'], 'win')
+
+# ==== f. Sudden Stake Jump > 100% ====
+daily_stake_df = daily_stake.reset_index()
+daily_stake_df.columns = ['Date', 'Stake']
+daily_stake_df['Prev_Stake'] = daily_stake_df['Stake'].shift(1)
+daily_stake_df['Stake_Jump_%'] = ((daily_stake_df['Stake'] - daily_stake_df['Prev_Stake']) /
+                                   daily_stake_df['Prev_Stake']) * 100
+sharp_jumps = daily_stake_df[daily_stake_df['Stake_Jump_%'] > 100]
+
+# ==== g. Risk Score (Simple Composite) ====
+risk_score = (
+    len(risky_days) +
+    (night_bet_ratio > 25) * 2 +
+    (chasing_count > 3) * 2 +
+    len(high_freq_days) +
+    (longest_loss_streak >= 5) * 2 +
+    len(sharp_jumps)
+)
+
+# ==== Final Summary Table ====
+insights = {
+    'Total Bets': len(df),
+    'Total Risky Days (Stake > 10k)': len(risky_days),
+    'Night Betting Ratio (%)': round(night_bet_ratio, 2),
+    'Chasing Loss Count': int(chasing_count),
+    'Days with >10 Bets': len(high_freq_days),
+    'Longest Win Streak': longest_win_streak,
+    'Longest Loss Streak': longest_loss_streak,
+    'Days with >100% Stake Jump': len(sharp_jumps),
+    'Responsible Gambling Risk Score (out of ~10)': risk_score
+}
+
+insight_df = pd.DataFrame.from_dict(insights, orient='index', columns=['Value'])
+
+# ==== Export ====
+os.makedirs("exports/data", exist_ok=True)
+insight_df.to_excel("exports/data/responsible_gambling_insights.xlsx", index=True)
+
+print("✅ Responsible Gambling Insights Exported:")
+print(insight_df)
 
