@@ -1,4 +1,5 @@
 # %% [code]
+# %% [code]
 """
 Author: ABIODUN TIAMIYU
 Date: 2025-07-09
@@ -252,8 +253,8 @@ os.makedirs("exports/plots", exist_ok=True)
 os.makedirs("exports/data", exist_ok=True)
 
 # === Export summary metrics and data ===
-summary_df.to_excel("exports/data/betting_metrics_summary.xlsx", index=False)
-df.to_excel("exports/data/bet_history_data.xlsx", index=False)
+summary_df.to_csv("exports/data/betting_metrics_summary.csv", index=False)
+df.to_csv("exports/data/bet_history_data.csv", index=False)
 
 # === 1. Pie Chart: Bet Result Distribution ===
 result_counts = df['Result'].value_counts()
